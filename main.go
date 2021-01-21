@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"unicode"
 )
 
 func main() {
@@ -22,6 +24,7 @@ func main() {
 	http.Handle("/", fs)
 
 	http.HandleFunc("/search", handleSearch(searcher))
+	http.HandleFunc("/recommendations", handleRecommendations(searcher))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -72,11 +75,33 @@ func (s *Searcher) Load(filename string) error {
 	return nil
 }
 
+func IsUpper(s string) bool {
+    for _, r := range s {
+        if !unicode.IsUpper(r) && unicode.IsLetter(r) {
+            return false
+        }
+    }
+    return true
+}
+
 func (s *Searcher) Search(query string) []string {
-	idxs := s.SuffixArray.Lookup([]byte(query), -1)
-	results := []string{}
-	for _, idx := range idxs {
-		results = append(results, s.CompleteWorks[idx-250:idx+250])
+	isQueryMayus := IsUpper(query)
+	_rxp := `([A-Z](.+)[\s\.-]){4}`+query+`((.+)[\s\.-]){4}`
+	if isQueryMayus {
+		_rxp = query+`((.+)[\s\.-]){5}`
 	}
+	fmt.Println(_rxp)
+	rxp, err := regexp.Compile(_rxp)
+	fmt.Println(rxp)
+	results := []string{}
+	if err != nil {
+		panic("something went wrong with our search")
+	}
+	idxs := s.SuffixArray.FindAllIndex(rxp, -1)
+	fmt.Println(idxs)
+	for _, idx := range idxs {
+		results = append(results, s.CompleteWorks[idx[0]:idx[1]])
+	}
+	fmt.Println(results)
 	return results
 }
